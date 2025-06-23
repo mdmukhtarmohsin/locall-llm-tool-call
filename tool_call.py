@@ -29,12 +29,41 @@ model = AutoGPTQForCausalLM.from_quantized(
 generator = pipeline("text-generation", model=model, tokenizer=tokenizer)
 
 def python_exec(code: str):
+    safe_builtins = {
+        'len': len,
+        'sum': sum,
+        'min': min,
+        'max': max,
+        'sorted': sorted,
+        'range': range,
+        'str': str,
+        'int': int,
+        'float': float,
+        'bool': bool,
+        'list': list,
+        'dict': dict,
+        'set': set,
+        'abs': abs,
+        'round': round,
+        'enumerate': enumerate,
+        'zip': zip,
+        'map': map,
+        'filter': filter,
+        'any': any,
+        'all': all,
+    }
+
     try:
-        return str(eval(code, {"__builtins__": {}}))
+        return str(eval(code, {"__builtins__": safe_builtins}))
     except Exception as e:
         return f"[Error]: {e}"
 
 def noop(_): return None
+
+tools = {
+    "python.exec": python_exec,
+    "noop": noop
+}
 
 def build_prompt(user_input):
     return f"""You are a helpful assistant that uses tools.
@@ -71,15 +100,17 @@ def call_model(prompt, max_new_tokens=100):
 import re
 
 import re
+import re
 
 def extract_tool_call(response):
-    # Strip out everything before TOOL:
-    if "TOOL:" in response:
-        tool_line = response.split("TOOL:")[-1].strip()
-        match = re.match(r"(\w+)\((['\"])(.*?)\2\)", tool_line)
-        if match:
-            tool_name, _, arg = match.groups()
-            return tool_name, arg
+    """
+    Extracts tool name and code from LLM response.
+    Returns ("tool.name", "argument") or ("noop", "") if not found.
+    """
+    match = re.search(r'TOOL:\s*([a-zA-Z0-9_.]+)\((["\'])(.*?)\2\)', response.strip())
+    if match:
+        tool, _, arg = match.groups()
+        return tool, arg
     return "noop", ""
 
 def run_agent(user_input):
