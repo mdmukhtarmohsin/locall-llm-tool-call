@@ -70,10 +70,16 @@ def call_model(prompt, max_new_tokens=100):
 
 import re
 
+import re
+
 def extract_tool_call(response):
-    match = re.search(r'TOOL:\s*(\w+)\((["\'])(.*?)\2\)', response)
-    if match:
-        return match.groups()
+    # Strip out everything before TOOL:
+    if "TOOL:" in response:
+        tool_line = response.split("TOOL:")[-1].strip()
+        match = re.match(r"(\w+)\((['\"])(.*?)\2\)", tool_line)
+        if match:
+            tool_name, _, arg = match.groups()
+            return tool_name, arg
     return "noop", ""
 
 def run_agent(user_input):
